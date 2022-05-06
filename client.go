@@ -249,16 +249,16 @@ func (c *Client) StartGameLoop(ctx context.Context) {
 				c.stop <- nil
 				break gameLoop
 			}
-			for _, chat := range resp.GetChat() {
-				select {
-				case receivedChats <- chat:
-				default:
-					log.Println("[WARN] receivedChats overflowed:", chat.String())
+			if c.step != nil {
+				for _, chat := range resp.GetChat() {
+					select {
+					case receivedChats <- chat:
+					default:
+						log.Println("[WARN] receivedChats overflowed:", chat.String())
+					}
 				}
-			}
 
-			if resp.GetObservation().GetGameLoop() > prevStep {
-				if c.step != nil {
+				if resp.GetObservation().GetGameLoop() > prevStep {
 					c.step(ctx, &StepState{
 						PlayerId:      c.playerId,
 						Steps:         resp.GetObservation().GetGameLoop(),
@@ -266,17 +266,17 @@ func (c *Client) StartGameLoop(ctx context.Context) {
 						ReceivedChats: receivedChats,
 						Stop:          stopStep,
 					})
-				}
-				prevStep = resp.GetObservation().GetGameLoop()
-				select {
-				case err := <-stopStep:
-					if err != nil {
-						c.stop <- fmt.Errorf("game loop step stopped with error: %w", err)
-					} else {
-						c.stop <- nil
+					prevStep = resp.GetObservation().GetGameLoop()
+					select {
+					case err := <-stopStep:
+						if err != nil {
+							c.stop <- fmt.Errorf("game loop step stopped with error: %w", err)
+						} else {
+							c.stop <- nil
+						}
+						break gameLoop
+					default:
 					}
-					break gameLoop
-				default:
 				}
 			}
 		}
