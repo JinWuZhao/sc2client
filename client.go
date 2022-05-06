@@ -12,13 +12,21 @@ import (
 	"github.com/jinwuzhao/sc2client/sc2proto"
 )
 
+type StepState struct {
+	PlayerId      uint32
+	Steps         uint32
+	Rpc           *RpcClient
+	ReceivedChats <-chan *sc2proto.ChatReceived
+	Stop          chan<- error
+}
+
 type PlayerSetup struct {
 	Type       sc2proto.PlayerType
 	Race       sc2proto.Race
 	Name       string
 	Difficulty sc2proto.Difficulty
 	AIBuild    sc2proto.AIBuild
-	Step       func(ctx context.Context, steps uint32, rpc *RpcClient, stop chan<- error)
+	Step       func(ctx context.Context, state *StepState)
 }
 
 type Client struct {
@@ -34,7 +42,7 @@ type Client struct {
 	deferList    []func()
 	stop         chan error
 	playerId     uint32
-	step         func(context.Context, uint32, *RpcClient, chan<- error)
+	step         func(context.Context, *StepState)
 }
 
 func ClientDisplayModeOpts(displayMode int) func(*Client) {
@@ -134,13 +142,6 @@ func (c *Client) Finalize() {
 }
 
 func (c *Client) HostGame(ctx context.Context, portConfig *PortConfig, gameMap string, players []*PlayerSetup, disableFog bool) error {
-	var err error
-	defer func() {
-		if err != nil {
-			c.Finalize()
-		}
-	}()
-
 	var playerSetups []*sc2proto.PlayerSetup
 	for _, player := range players {
 		playerSetups = append(playerSetups, &sc2proto.PlayerSetup{
@@ -201,13 +202,6 @@ func (c *Client) HostGame(ctx context.Context, portConfig *PortConfig, gameMap s
 }
 
 func (c *Client) JoinGame(ctx context.Context, portConfig *PortConfig, players []*PlayerSetup) error {
-	var err error
-	defer func() {
-		if err != nil {
-			c.Finalize()
-		}
-	}()
-
 	joinGameRsp, err := c.rpc.JoinGame(ctx, &sc2proto.RequestJoinGame{
 		Participation: &sc2proto.RequestJoinGame_Race{
 			Race: players[1].Race,
@@ -242,6 +236,7 @@ func (c *Client) StartGameLoop(ctx context.Context) {
 	go func() {
 		stopStep := make(chan error, 1)
 		var prevStep uint32
+		receivedChats := make(chan *sc2proto.ChatReceived, 100)
 	gameLoop:
 		for ctx.Err() == nil {
 			resp, err := c.rpc.Observation(ctx, &sc2proto.RequestObservation{})
@@ -254,9 +249,23 @@ func (c *Client) StartGameLoop(ctx context.Context) {
 				c.stop <- nil
 				break gameLoop
 			}
+			for _, chat := range resp.GetChat() {
+				select {
+				case receivedChats <- chat:
+				default:
+					log.Println("[WARN] receivedChats overflowed:", chat.String())
+				}
+			}
+
 			if resp.GetObservation().GetGameLoop() > prevStep {
 				if c.step != nil {
-					c.step(ctx, resp.GetObservation().GetGameLoop(), c.rpc, stopStep)
+					c.step(ctx, &StepState{
+						PlayerId:      c.playerId,
+						Steps:         resp.GetObservation().GetGameLoop(),
+						Rpc:           c.rpc,
+						ReceivedChats: receivedChats,
+						Stop:          stopStep,
+					})
 				}
 				prevStep = resp.GetObservation().GetGameLoop()
 				select {

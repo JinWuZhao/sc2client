@@ -26,39 +26,48 @@ func TestRun_RunGame(t *testing.T) {
 				Name:       "Director",
 				Difficulty: sc2proto.Difficulty_Easy,
 				AIBuild:    sc2proto.AIBuild_RandomBuild,
-				Step: func(ctx context.Context, steps uint32, rpc *RpcClient, stop chan<- error) {
-					if steps%100 == 0 {
-						_, err := rpc.Action(ctx, &sc2proto.RequestAction{
+				Step: func(ctx context.Context, state *StepState) {
+					if state.Steps%100 == 0 {
+						_, err := state.Rpc.Action(ctx, &sc2proto.RequestAction{
 							Actions: []*sc2proto.Action{
 								{
 									ActionChat: &sc2proto.ActionChat{
 										Channel: sc2proto.ActionChat_Team.Enum(),
-										Message: proto.String(fmt.Sprintf("cmd-create-siege-tank 3 红-%d", steps)),
+										Message: proto.String(fmt.Sprintf("cmd-create-siege-tank 3 红-%d", state.Steps)),
 									},
 								},
 								{
 									ActionChat: &sc2proto.ActionChat{
 										Channel: sc2proto.ActionChat_Team.Enum(),
-										Message: proto.String(fmt.Sprintf("cmd-move-toward 红-%d %d %d", steps, rand.Intn(90)-45, rand.Intn(100)*2)),
+										Message: proto.String(fmt.Sprintf("cmd-move-toward 红-%d %d %d", state.Steps, rand.Intn(90)-45, rand.Intn(100)*2)),
 									},
 								},
 								{
 									ActionChat: &sc2proto.ActionChat{
 										Channel: sc2proto.ActionChat_Team.Enum(),
-										Message: proto.String(fmt.Sprintf("cmd-create-siege-tank 4 蓝-%d", steps)),
+										Message: proto.String(fmt.Sprintf("cmd-create-siege-tank 4 蓝-%d", state.Steps)),
 									},
 								},
 								{
 									ActionChat: &sc2proto.ActionChat{
 										Channel: sc2proto.ActionChat_Team.Enum(),
-										Message: proto.String(fmt.Sprintf("cmd-move-toward 蓝-%d %d %d", steps, rand.Intn(90)+135, rand.Intn(100)*2)),
+										Message: proto.String(fmt.Sprintf("cmd-move-toward 蓝-%d %d %d", state.Steps, rand.Intn(90)+135, rand.Intn(100)*2)),
 									},
 								},
 							},
 						})
 						if err != nil {
-							stop <- fmt.Errorf("rpc.Action() error: %w", err)
+							state.Stop <- fmt.Errorf("rpc.Action() error: %w", err)
 							return
+						}
+					foreachChats:
+						for {
+							select {
+							case msg := <-state.ReceivedChats:
+								t.Logf("recive message from player %d: %s", msg.GetPlayerId(), msg.GetMessage())
+							default:
+								break foreachChats
+							}
 						}
 					}
 				},

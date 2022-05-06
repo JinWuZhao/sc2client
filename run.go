@@ -10,8 +10,8 @@ func RunGame(ctx context.Context, gameMap string, players []*PlayerSetup, disabl
 	if gameMap == "" {
 		return fmt.Errorf("invalid game map")
 	}
-	if len(players) < 2 {
-		return fmt.Errorf("need two players at least")
+	if len(players) != 2 {
+		return fmt.Errorf("need two players")
 	}
 
 	pc, err := NewPortConfig()
@@ -20,7 +20,7 @@ func RunGame(ctx context.Context, gameMap string, players []*PlayerSetup, disabl
 	}
 
 	clients := []*Client{NewClient(), NewClient()}
-	errors := make(chan error, 2)
+	errors := make([]error, 2)
 	var wg sync.WaitGroup
 	wg.Add(len(clients))
 	for i, c := range clients {
@@ -29,44 +29,39 @@ func RunGame(ctx context.Context, gameMap string, players []*PlayerSetup, disabl
 		go func() {
 			err := client.Init(ctx)
 			if err != nil {
-				errors <- fmt.Errorf("client.Init() error: %w", err)
+				errors[index] = fmt.Errorf("client.Init() error: %w", err)
+				wg.Done()
 				return
 			}
 			for ctx.Err() == nil {
 				if index == 0 {
 					err = client.HostGame(ctx, pc, gameMap, players, disableFog)
 					if err != nil {
-						errors <- fmt.Errorf("client.HostGame() error: %w", err)
-						return
+						errors[index] = fmt.Errorf("client.HostGame() error: %w", err)
+						break
 					}
 				} else {
 					err = client.JoinGame(ctx, pc, players)
 					if err != nil {
-						errors <- fmt.Errorf("client.JoinGame() error: %w", err)
-						return
+						errors[index] = fmt.Errorf("client.JoinGame() error: %w", err)
+						break
 					}
 				}
 				client.StartGameLoop(ctx)
 				err = client.WaitGameEnd()
 				if err != nil {
-					errors <- fmt.Errorf("client.WaitGameEnd() error: %w", err)
-					return
+					errors[index] = fmt.Errorf("client.WaitGameEnd() error: %w", err)
+					break
 				}
 			}
 			client.Finalize()
-			select {
-			case errors <- nil:
-			default:
-			}
 			wg.Done()
 		}()
 	}
 	wg.Wait()
 
-	err1 := <-errors
-	err2 := <-errors
-	if err1 != nil || err2 != nil {
-		return fmt.Errorf("clients error: [1](%s), [2](%s)", err1, err2)
+	if errors[0] != nil || errors[1] != nil {
+		return fmt.Errorf("clients error: [1](%s), [2](%s)", errors[0], errors[1])
 	}
 	return nil
 }
