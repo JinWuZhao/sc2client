@@ -238,7 +238,7 @@ func (c *Client) StartGameLoop(ctx context.Context) {
 		var prevStep uint32
 		receivedChats := make(chan *sc2proto.ChatReceived, 100)
 	gameLoop:
-		for ctx.Err() == nil {
+		for {
 			resp, err := c.rpc.Observation(ctx, &sc2proto.RequestObservation{})
 			if err != nil {
 				c.stop <- fmt.Errorf("c.rpc.Observation() error: %w", err)
@@ -279,21 +279,24 @@ func (c *Client) StartGameLoop(ctx context.Context) {
 					}
 				}
 			}
+
+			select {
+			case <-ctx.Done():
+				c.stop <- nil
+				break gameLoop
+			default:
+			}
 		}
 	}()
 }
 
-func (c *Client) WaitGameEnd(ctx context.Context) error {
+func (c *Client) WaitGameEnd() error {
 	defer func() {
 		_, _ = c.rpc.LeaveGame(context.Background(), &sc2proto.RequestLeaveGame{})
 	}()
-	var retErr error
-	select {
-	case <-ctx.Done():
-	case err := <-c.stop:
-		if err != nil {
-			retErr = fmt.Errorf("game loop end with error: %w", err)
-		}
+	err := <-c.stop
+	if err != nil {
+		return fmt.Errorf("game loop end with error: %w", err)
 	}
-	return retErr
+	return nil
 }

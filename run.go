@@ -33,25 +33,31 @@ func RunGame(ctx context.Context, gameMap string, players []*PlayerSetup, disabl
 				wg.Done()
 				return
 			}
-			for ctx.Err() == nil {
+		gameLoop:
+			for {
 				if index == 0 {
 					err = client.HostGame(ctx, pc, gameMap, players, disableFog)
 					if err != nil {
 						errors[index] = fmt.Errorf("client.HostGame() error: %w", err)
-						break
+						break gameLoop
 					}
 				} else {
 					err = client.JoinGame(ctx, pc, players)
 					if err != nil {
 						errors[index] = fmt.Errorf("client.JoinGame() error: %w", err)
-						break
+						break gameLoop
 					}
 				}
 				client.StartGameLoop(ctx)
-				err = client.WaitGameEnd(ctx)
+				err = client.WaitGameEnd()
 				if err != nil {
 					errors[index] = fmt.Errorf("client.WaitGameEnd() error: %w", err)
-					break
+					break gameLoop
+				}
+				select {
+				case <-ctx.Done():
+					break gameLoop
+				default:
 				}
 			}
 			client.Finalize()
