@@ -8,7 +8,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"nhooyr.io/websocket"
 
-	"github.com/jinwuzhao/sc2client/sc2proto"
+	"github.com/JinWuZhao/sc2client/sc2proto"
 )
 
 type Connection struct {

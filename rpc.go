@@ -8,7 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/jinwuzhao/sc2client/sc2proto"
+	"github.com/JinWuZhao/sc2client/sc2proto"
 )
 
 type IDGenerator struct {

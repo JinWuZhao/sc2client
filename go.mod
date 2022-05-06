@@ -1,4 +1,4 @@
-module github.com/jinwuzhao/sc2client
+module github.com/JinWuZhao/sc2client
 
 go 1.18
 

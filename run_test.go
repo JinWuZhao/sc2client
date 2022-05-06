@@ -10,7 +10,7 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
-	"github.com/jinwuzhao/sc2client/sc2proto"
+	"github.com/JinWuZhao/sc2client/sc2proto"
 )
 
 func TestRun_RunGame(t *testing.T) {

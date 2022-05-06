@@ -9,7 +9,7 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
-	"github.com/jinwuzhao/sc2client/sc2proto"
+	"github.com/JinWuZhao/sc2client/sc2proto"
 )
 
 type StepState struct {
@@ -283,13 +283,17 @@ func (c *Client) StartGameLoop(ctx context.Context) {
 	}()
 }
 
-func (c *Client) WaitGameEnd() error {
+func (c *Client) WaitGameEnd(ctx context.Context) error {
 	defer func() {
 		_, _ = c.rpc.LeaveGame(context.Background(), &sc2proto.RequestLeaveGame{})
 	}()
-	err := <-c.stop
-	if err != nil {
-		return fmt.Errorf("game loop end with error: %w", err)
+	var retErr error
+	select {
+	case <-ctx.Done():
+	case err := <-c.stop:
+		if err != nil {
+			retErr = fmt.Errorf("game loop end with error: %w", err)
+		}
 	}
-	return nil
+	return retErr
 }

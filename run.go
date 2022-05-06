@@ -48,7 +48,7 @@ func RunGame(ctx context.Context, gameMap string, players []*PlayerSetup, disabl
 					}
 				}
 				client.StartGameLoop(ctx)
-				err = client.WaitGameEnd()
+				err = client.WaitGameEnd(ctx)
 				if err != nil {
 					errors[index] = fmt.Errorf("client.WaitGameEnd() error: %w", err)
 					break

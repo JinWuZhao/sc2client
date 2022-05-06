@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jinwuzhao/sc2client/sc2proto"
+	"github.com/JinWuZhao/sc2client/sc2proto"
 )
 
 func TestConnection_WriteRead(t *testing.T) {

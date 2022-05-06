@@ -2,7 +2,7 @@ syntax = "proto2";
 
 package sc2proto;
 
-option go_package = "github.com/jinwuzhao/sc2client-go/sc2proto";
+option go_package = "github.com/JinWuZhao/sc2client/sc2proto";
 
 //
 // Observation
