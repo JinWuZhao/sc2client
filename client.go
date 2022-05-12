@@ -26,7 +26,13 @@ type PlayerSetup struct {
 	Name       string
 	Difficulty sc2proto.Difficulty
 	AIBuild    sc2proto.AIBuild
-	Step       func(ctx context.Context, state *StepState)
+	Agent      PlayerAgent
+}
+
+type PlayerAgent interface {
+	OnStart()
+	OnStep(ctx context.Context, state *StepState)
+	OnEnd(result sc2proto.Result)
 }
 
 type Client struct {
@@ -42,7 +48,7 @@ type Client struct {
 	deferList    []func()
 	stop         chan error
 	playerId     uint32
-	step         func(context.Context, *StepState)
+	agent        PlayerAgent
 }
 
 func ClientDisplayModeOpts(displayMode int) func(*Client) {
@@ -196,7 +202,11 @@ func (c *Client) HostGame(ctx context.Context, portConfig *PortConfig, gameMap s
 	}
 
 	c.playerId = joinGameRsp.GetPlayerId()
-	c.step = players[0].Step
+	c.agent = players[0].Agent
+
+	if c.agent != nil {
+		c.agent.OnStart()
+	}
 
 	return nil
 }
@@ -227,7 +237,11 @@ func (c *Client) JoinGame(ctx context.Context, portConfig *PortConfig, players [
 	}
 
 	c.playerId = joinGameRsp.GetPlayerId()
-	c.step = players[1].Step
+	c.agent = players[1].Agent
+
+	if c.agent != nil {
+		c.agent.OnStart()
+	}
 
 	return nil
 }
@@ -246,10 +260,18 @@ func (c *Client) StartGameLoop(ctx context.Context) {
 			}
 			playerResult := resp.GetPlayerResult()
 			if len(playerResult) > 0 {
+				if c.agent != nil {
+					for _, result := range playerResult {
+						if result.GetPlayerId() == c.playerId {
+							c.agent.OnEnd(result.GetResult())
+							break
+						}
+					}
+				}
 				c.stop <- nil
 				break gameLoop
 			}
-			if c.step != nil {
+			if c.agent != nil {
 				for _, chat := range resp.GetChat() {
 					select {
 					case receivedChats <- chat:
@@ -259,7 +281,7 @@ func (c *Client) StartGameLoop(ctx context.Context) {
 				}
 
 				if resp.GetObservation().GetGameLoop() > prevStep {
-					c.step(ctx, &StepState{
+					c.agent.OnStep(ctx, &StepState{
 						PlayerId:      c.playerId,
 						Steps:         resp.GetObservation().GetGameLoop(),
 						Rpc:           c.rpc,
