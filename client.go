@@ -13,9 +13,7 @@ import (
 )
 
 type StepState struct {
-	PlayerId      uint32
 	Steps         uint32
-	Rpc           *RpcClient
 	ReceivedChats <-chan *sc2proto.ChatReceived
 	Stop          chan<- error
 }
@@ -30,7 +28,7 @@ type PlayerSetup struct {
 }
 
 type PlayerAgent interface {
-	OnStart()
+	OnStart(playerId uint32, rpc *RpcClient)
 	OnStep(ctx context.Context, state *StepState)
 	OnEnd(result sc2proto.Result)
 }
@@ -205,7 +203,7 @@ func (c *Client) HostGame(ctx context.Context, portConfig *PortConfig, gameMap s
 	c.agent = players[0].Agent
 
 	if c.agent != nil {
-		c.agent.OnStart()
+		c.agent.OnStart(c.playerId, c.rpc)
 	}
 
 	return nil
@@ -240,7 +238,7 @@ func (c *Client) JoinGame(ctx context.Context, portConfig *PortConfig, players [
 	c.agent = players[1].Agent
 
 	if c.agent != nil {
-		c.agent.OnStart()
+		c.agent.OnStart(c.playerId, c.rpc)
 	}
 
 	return nil
@@ -282,9 +280,7 @@ func (c *Client) StartGameLoop(ctx context.Context) {
 
 				if resp.GetObservation().GetGameLoop() > prevStep {
 					c.agent.OnStep(ctx, &StepState{
-						PlayerId:      c.playerId,
 						Steps:         resp.GetObservation().GetGameLoop(),
-						Rpc:           c.rpc,
 						ReceivedChats: receivedChats,
 						Stop:          stopStep,
 					})

@@ -15,15 +15,19 @@ import (
 )
 
 type DirectorAgent struct {
+	rpc      *RpcClient
+	playerId uint32
 }
 
-func (m *DirectorAgent) OnStart() {
+func (m *DirectorAgent) OnStart(playerId uint32, rpc *RpcClient) {
 	log.Println("OnStart()")
+	m.rpc = rpc
+	m.playerId = playerId
 }
 
 func (m *DirectorAgent) OnStep(ctx context.Context, state *StepState) {
 	if state.Steps%100 == 0 {
-		_, err := state.Rpc.Action(ctx, &sc2proto.RequestAction{
+		_, err := m.rpc.Action(ctx, &sc2proto.RequestAction{
 			Actions: []*sc2proto.Action{
 				{
 					ActionChat: &sc2proto.ActionChat{
