@@ -6,8 +6,8 @@ import (
 	"sync"
 )
 
-func RunGame(ctx context.Context, gameMap string, players []*PlayerSetup, disableFog bool) error {
-	if gameMap == "" {
+func RunGame(ctx context.Context, gameMaps []string, players []*PlayerSetup, disableFog bool) error {
+	if len(gameMaps) <= 0 {
 		return fmt.Errorf("invalid game map")
 	}
 	if len(players) != 2 {
@@ -33,10 +33,11 @@ func RunGame(ctx context.Context, gameMap string, players []*PlayerSetup, disabl
 				wg.Done()
 				return
 			}
+			var mapIndex int
 		gameLoop:
 			for {
 				if index == 0 {
-					err = client.HostGame(ctx, pc, gameMap, players, disableFog)
+					err = client.HostGame(ctx, pc, gameMaps[mapIndex], players, disableFog)
 					if err != nil {
 						errors[index] = fmt.Errorf("client.HostGame() error: %w", err)
 						break gameLoop
@@ -58,6 +59,10 @@ func RunGame(ctx context.Context, gameMap string, players []*PlayerSetup, disabl
 				case <-ctx.Done():
 					break gameLoop
 				default:
+				}
+				mapIndex++
+				if mapIndex >= len(gameMaps) {
+					mapIndex = 0
 				}
 			}
 			client.Finalize()
