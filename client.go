@@ -77,7 +77,7 @@ func NewClient(opts ...func(*Client)) *Client {
 		windowHeight: 768,
 		windowX:      100,
 		windowY:      100,
-		rpcTimeout:   30 * time.Second,
+		rpcTimeout:   10 * time.Second,
 		stop:         make(chan error, 1),
 	}
 	for _, option := range opts {
