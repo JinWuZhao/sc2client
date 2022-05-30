@@ -1,7 +1,6 @@
 package sc2client
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -27,20 +26,10 @@ type Launcher struct {
 }
 
 func NewLauncher(clientHost string, clientPort int, displayMode int, windowWidth int, windowHeight int, windowX int, windowY int) (*Launcher, error) {
-	homeDir, err := os.UserHomeDir()
+	clientPath, err := GetSC2ClientPath()
 	if err != nil {
-		return nil, fmt.Errorf("os.UserHomeDir() error: %w", err)
+		return nil, fmt.Errorf("GetSC2ClientPath() error: %w", err)
 	}
-	exeInfo, err := os.ReadFile(filepath.Join(homeDir, "Documents", "StarCraft II", "ExecuteInfo.txt"))
-	if err != nil {
-		return nil, fmt.Errorf("os.ReadFile() error: %w", err)
-	}
-	stmtParts := bytes.Split(exeInfo, []byte{'='})
-	if len(stmtParts) != 2 && !bytes.Equal(bytes.TrimSpace(stmtParts[0]), []byte("executable")) {
-		return nil, fmt.Errorf("unrecognized ExecuteInfo: %s", exeInfo)
-	}
-	clientPath := string(bytes.TrimSuffix(bytes.TrimSpace(stmtParts[1]), []byte{'\n', 0x00}))
-
 	clientInstallDir, err := filepath.Abs(filepath.Join(clientPath, "..", "..", ".."))
 	if err != nil {
 		return nil, fmt.Errorf("filepath.Abs() error: %w", err)

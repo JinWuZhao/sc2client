@@ -1,8 +1,11 @@
 package sc2client
 
 import (
+	"bytes"
 	"fmt"
 	"net"
+	"os"
+	"path/filepath"
 	"strconv"
 )
 
@@ -41,4 +44,32 @@ func NewPortConfig() (*PortConfig, error) {
 		}
 	}
 	return pc, nil
+}
+
+func GetSC2ClientPath() (string, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("os.UserHomeDir() error: %w", err)
+	}
+	exeInfo, err := os.ReadFile(filepath.Join(homeDir, "Documents", "StarCraft II", "ExecuteInfo.txt"))
+	if err != nil {
+		return "", fmt.Errorf("os.ReadFile() error: %w", err)
+	}
+	stmtParts := bytes.Split(exeInfo, []byte{'='})
+	if len(stmtParts) != 2 && !bytes.Equal(bytes.TrimSpace(stmtParts[0]), []byte("executable")) {
+		return "", fmt.Errorf("unrecognized ExecuteInfo: %s", exeInfo)
+	}
+	return string(bytes.TrimSuffix(bytes.TrimSpace(stmtParts[1]), []byte{'\n', 0x00})), nil
+}
+
+func GetSC2InstallDir() (string, error) {
+	clientPath, err := GetSC2ClientPath()
+	if err != nil {
+		return "", fmt.Errorf("GetSC2ClientPath() error: %w", err)
+	}
+	clientInstallDir, err := filepath.Abs(filepath.Join(clientPath, "..", "..", ".."))
+	if err != nil {
+		return "", fmt.Errorf("filepath.Abs() error: %w", err)
+	}
+	return clientInstallDir, nil
 }
