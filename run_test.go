@@ -80,7 +80,9 @@ func TestRun_RunGame(t *testing.T) {
 	defer stop()
 
 	err := RunGame(ctx,
-		"Custom/StarArena.SC2Map",
+		[]GameMap{
+			{Name: "StarArena.SC2Map"},
+		},
 		[]*PlayerSetup{
 			{
 				Type:       sc2proto.PlayerType_Participant,

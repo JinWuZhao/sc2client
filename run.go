@@ -3,10 +3,44 @@ package sc2client
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"sync"
 )
 
-func RunGame(ctx context.Context, gameMaps []string, players []*PlayerSetup, disableFog bool) error {
+type GameMap struct {
+	Name       string
+	SourcePath string
+}
+
+func installGameMap(gameMap GameMap) error {
+	if gameMap.SourcePath == "" {
+		return nil
+	}
+	sc2Path, err := GetSC2InstallDir()
+	if err != nil {
+		return fmt.Errorf("GetSC2InstallDir() error: %w", err)
+	}
+	sc2MapPath := filepath.Join(sc2Path, "Maps")
+	if _, err := os.Stat(sc2MapPath); os.IsNotExist(err) {
+		err = os.Mkdir(sc2MapPath, os.ModePerm)
+		if err != nil {
+			return fmt.Errorf("os.Mkdir(%s) error: %w", sc2MapPath, err)
+		}
+	}
+	content, err := os.ReadFile(gameMap.SourcePath)
+	if err != nil {
+		return fmt.Errorf("os.ReadFile(%s) error: %w", gameMap.SourcePath, err)
+	}
+	dstPath := filepath.Join(sc2MapPath, gameMap.Name)
+	err = os.WriteFile(dstPath, content, os.ModePerm)
+	if err != nil {
+		return fmt.Errorf("os.WriteFile(%s) error: %w", dstPath, err)
+	}
+	return nil
+}
+
+func RunGame(ctx context.Context, gameMaps []GameMap, players []*PlayerSetup, disableFog bool) error {
 	if len(gameMaps) <= 0 {
 		return fmt.Errorf("invalid game map")
 	}
@@ -37,7 +71,12 @@ func RunGame(ctx context.Context, gameMaps []string, players []*PlayerSetup, dis
 		gameLoop:
 			for {
 				if index == 0 {
-					err = client.HostGame(ctx, pc, gameMaps[mapIndex], players, disableFog)
+					err = installGameMap(gameMaps[mapIndex])
+					if err != nil {
+						errors[index] = fmt.Errorf("installGameMap() error: %w", err)
+						break gameLoop
+					}
+					err = client.HostGame(ctx, pc, gameMaps[mapIndex].Name, players, disableFog)
 					if err != nil {
 						errors[index] = fmt.Errorf("client.HostGame() error: %w", err)
 						break gameLoop
