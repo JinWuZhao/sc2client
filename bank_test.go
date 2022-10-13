@@ -15,7 +15,7 @@ func TestBank_Load(t *testing.T) {
 		t.Errorf("bank.Load() error: %s", err)
 		return
 	}
-	t.Logf("%+v", bank.data)
+	t.Logf("%s", bank.data)
 }
 
 func TestBank_Save(t *testing.T) {
@@ -47,7 +47,7 @@ func TestBank_StoreValue(t *testing.T) {
 		t.Errorf("bank.Load() error: %s", err)
 		return
 	}
-	bank.StoreValue("rank", "first", BankValue{
+	bank.StoreKey("rank", "first", BankValue{
 		Type:  BankValueTypeString,
 		Value: "星际竞技场",
 	})
@@ -69,7 +69,7 @@ func TestBank_LoadValue(t *testing.T) {
 		t.Errorf("bank.Load() error: %s", err)
 		return
 	}
-	value, ok := bank.LoadValue("rank", "first")
+	value, ok := bank.LoadKey("rank", "first")
 	if ok {
 		t.Log(value)
 	}

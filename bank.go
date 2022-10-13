@@ -32,20 +32,25 @@ type XMLKey struct {
 type XMLSection struct {
 	XMLName   xml.Name       `xml:"Section"`
 	Name      string         `xml:"name,attr"`
-	Keys      []XMLKey       `xml:"Key,omitempty"`
+	Keys      []*XMLKey      `xml:"Key,omitempty"`
 	IndexData map[string]int `xml:"-"`
 }
 
 type XMLBank struct {
 	XMLName   xml.Name       `xml:"Bank"`
 	Version   string         `xml:"version,attr"`
-	Sections  []XMLSection   `xml:"Section,omitempty"`
+	Sections  []*XMLSection  `xml:"Section,omitempty"`
 	IndexData map[string]int `xml:"-"`
+}
+
+func (b *XMLBank) String() string {
+	result, _ := xml.MarshalIndent(b, "", "    ")
+	return string(result)
 }
 
 type Bank struct {
 	path string
-	data XMLBank
+	data *XMLBank
 }
 
 func NewBank(name string) (*Bank, error) {
@@ -55,6 +60,7 @@ func NewBank(name string) (*Bank, error) {
 	}
 	return &Bank{
 		path: bankFilePath,
+		data: new(XMLBank),
 	}, nil
 }
 
@@ -63,7 +69,7 @@ func (b *Bank) Load() error {
 	if err != nil {
 		return fmt.Errorf(" os.ReadFile() error: %w", err)
 	}
-	err = xml.Unmarshal(bankFile, &b.data)
+	err = xml.Unmarshal(bankFile, b.data)
 	if err != nil {
 		return fmt.Errorf("xml.Unmarshal() error: %w", err)
 	}
@@ -74,7 +80,6 @@ func (b *Bank) Load() error {
 		for j, k := range s.Keys {
 			s.IndexData[k.Name] = j
 		}
-		b.data.Sections[i] = s
 	}
 	return nil
 }
@@ -91,10 +96,47 @@ func (b *Bank) Save() error {
 	return nil
 }
 
-func (b *Bank) StoreValue(section string, key string, value BankValue) {
+func (b *Bank) CreateSection(section string) {
 	sectionIndex, ok := b.data.IndexData[section]
 	if !ok {
-		b.data.Sections = append(b.data.Sections, XMLSection{
+		b.data.Sections = append(b.data.Sections, &XMLSection{
+			Name:      section,
+			IndexData: map[string]int{},
+		})
+		sectionIndex = len(b.data.Sections) - 1
+		b.data.IndexData[section] = sectionIndex
+	}
+}
+
+func (b *Bank) LoadSectionNames(index int, count int) []string {
+	var result []string
+	for _, s := range b.data.Sections[index : index+count] {
+		result = append(result, s.Name)
+	}
+	return result
+}
+
+func (b *Bank) RemoveSection(section string) {
+	sectionIndex, ok := b.data.IndexData[section]
+	if ok {
+		b.data.Sections = append(b.data.Sections[:sectionIndex], b.data.Sections[sectionIndex+1:]...)
+		delete(b.data.IndexData, section)
+	}
+}
+
+func (b *Bank) SectionExists(section string) bool {
+	_, ok := b.data.IndexData[section]
+	return ok
+}
+
+func (b *Bank) SectionsCount() int {
+	return len(b.data.Sections)
+}
+
+func (b *Bank) StoreKey(section string, key string, value BankValue) {
+	sectionIndex, ok := b.data.IndexData[section]
+	if !ok {
+		b.data.Sections = append(b.data.Sections, &XMLSection{
 			Name:      section,
 			IndexData: map[string]int{},
 		})
@@ -104,7 +146,7 @@ func (b *Bank) StoreValue(section string, key string, value BankValue) {
 	sectionData := b.data.Sections[sectionIndex]
 	keyIndex, ok := sectionData.IndexData[key]
 	if !ok {
-		sectionData.Keys = append(sectionData.Keys, XMLKey{
+		sectionData.Keys = append(sectionData.Keys, &XMLKey{
 			Name: key,
 		})
 		keyIndex = len(sectionData.Keys) - 1
@@ -116,10 +158,9 @@ func (b *Bank) StoreValue(section string, key string, value BankValue) {
 		},
 		Value: value.Value,
 	}
-	b.data.Sections[sectionIndex] = sectionData
 }
 
-func (b *Bank) LoadValue(section string, key string) (BankValue, bool) {
+func (b *Bank) LoadKey(section string, key string) (BankValue, bool) {
 	var result BankValue
 	sectionIndex, ok := b.data.IndexData[section]
 	if !ok {
@@ -134,4 +175,53 @@ func (b *Bank) LoadValue(section string, key string) (BankValue, bool) {
 	result.Type = valueData.Value.Name.Local
 	result.Value = valueData.Value.Value
 	return result, true
+}
+
+func (b *Bank) LoadKeys(section string, index int, count int) ([]string, []BankValue, bool) {
+	sectionIndex, ok := b.data.IndexData[section]
+	if !ok {
+		return nil, nil, false
+	}
+	sectionData := b.data.Sections[sectionIndex]
+	var keys []string
+	var values []BankValue
+	for _, k := range sectionData.Keys[index : index+count] {
+		keys = append(keys, k.Name)
+		values = append(values, BankValue{
+			Type:  k.Value.Value.Name.Local,
+			Value: k.Value.Value.Value,
+		})
+	}
+	return keys, values, true
+}
+
+func (b *Bank) RemoveKey(section string, key string) {
+	sectionIndex, ok := b.data.IndexData[section]
+	if ok {
+		sectionData := b.data.Sections[sectionIndex]
+		keyIndex, ok := sectionData.IndexData[key]
+		if ok {
+			sectionData.Keys = append(sectionData.Keys[:keyIndex], sectionData.Keys[:keyIndex+1]...)
+			delete(sectionData.IndexData, key)
+		}
+	}
+}
+
+func (b *Bank) KeyExists(section string, key string) bool {
+	sectionIndex, ok := b.data.IndexData[section]
+	if !ok {
+		return false
+	}
+	sectionData := b.data.Sections[sectionIndex]
+	_, ok = sectionData.IndexData[key]
+	return ok
+}
+
+func (b *Bank) KeysCount(section string) int {
+	sectionIndex, ok := b.data.IndexData[section]
+	if !ok {
+		return 0
+	}
+	sectionData := b.data.Sections[sectionIndex]
+	return len(sectionData.Keys)
 }
