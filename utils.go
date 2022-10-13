@@ -73,3 +73,27 @@ func GetSC2InstallDir() (string, error) {
 	}
 	return clientInstallDir, nil
 }
+
+func GetSC2BankDir() (string, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("os.UserHomeDir() error: %w", err)
+	}
+	banksDir := filepath.Join(homeDir, "Documents", "StarCraft II", "Banks")
+	fileInfo, err := os.Stat(banksDir)
+	if err != nil {
+		return "", fmt.Errorf("os.Stat(banksDir) error: %w", err)
+	}
+	if !fileInfo.IsDir() {
+		return "", fmt.Errorf("invalid banks dir")
+	}
+	return banksDir, nil
+}
+
+func GetSC2BankPath(name string) (string, error) {
+	bankDir, err := GetSC2BankDir()
+	if err != nil {
+		return "", fmt.Errorf("GetSC2BankDir() error: %w", err)
+	}
+	return filepath.Join(bankDir, name+".SC2Bank"), nil
+}
